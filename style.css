@@ -1,0 +1,145 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #080d18;
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+}
+
+.game-container {
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+}
+
+.logo {
+    font-size: 30px;
+    font-weight: 900;
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+}
+
+.logo span { color: #00d9ff; }
+
+.game-box {
+    position: relative;
+    width: 100%;
+    height: min(720px, 82vh);
+    min-height: 480px;
+    overflow: hidden;
+    border: 3px solid #26364d;
+    border-radius: 18px;
+    background: #252a32;
+    box-shadow: 0 0 35px #00cfff25;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.hud {
+    position: absolute;
+    top: 12px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    gap: 5px;
+}
+
+.hud-card {
+    background: #07111ddd;
+    border: 1px solid #34485c;
+    border-radius: 10px;
+    padding: 9px 10px;
+}
+
+.hud-card small {
+    display: block;
+    color: #9baec2;
+    font-size: 10px;
+}
+
+.hud-card strong { font-size: 16px; }
+#speed { color: #00d9ff; }
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: #050a14dc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    z-index: 5;
+}
+
+.overlay h1 {
+    font-size: 37px;
+    color: #00d9ff;
+    margin-bottom: 12px;
+}
+
+.overlay p {
+    color: #c4d0dd;
+    line-height: 1.8;
+    margin-bottom: 22px;
+}
+
+.game-btn {
+    background: linear-gradient(135deg, #00b9e8, #1769db);
+    border: none;
+    border-radius: 10px;
+    padding: 15px 32px;
+    color: white;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.hidden { display: none; }
+
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    gap: 10px;
+}
+
+.control-btn {
+    flex: 1;
+    height: 55px;
+    border-radius: 12px;
+    border: 1px solid #40536b;
+    background: #14263b;
+    color: #00d9ff;
+    font-size: 25px;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+.control-btn:active {
+    background: #087da3;
+    color: white;
+}
+
+.hint {
+    color: #8294a8;
+    font-size: 12px;
+    margin-top: 12px;
+}

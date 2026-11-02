@@ -1,0 +1,524 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRAFFIC RACER X</title>
+<link rel="stylesheet" href="style.css">
+<script src="script.js"></script>
+<link rel="icon" href="https://play-lh.googleusercontent.com/_ejsrjZE5qRla9oF57hoqWuOxHH0GzpxoGNTp9vXGQjcJx2WtXluQ82IWmBXgCS3FuQjGHps6_CNuLadFhCDMQ">
+</head>
+<body>
+<div class="game-container">
+
+    <div class="logo">TRAFFIC <span>RACER X</span></div>
+
+    <div class="game-box">
+
+        <canvas id="game"></canvas>
+
+        <div class="hud">
+            <div class="hud-card">
+                <small>SCORE</small>
+                <strong id="score">000000</strong>
+            </div>
+
+            <div class="hud-card">
+                <small>SPEED</small>
+                <strong id="speed">0 KM/H</strong>
+            </div>
+
+            <div class="hud-card">
+                <small>BEST</small>
+                <strong id="best">000000</strong>
+            </div>
+        </div>
+
+        <div class="overlay" id="startScreen">
+            <h1>🏎️ RACER X</h1>
+            <p>
+                TRAFFIC RACER X ga xush kelibsiz!<br>
+                1500 KM/H tezlikka erishing!<br>
+                Boshqa mashinalarga urilmang!
+            </p>
+            <button class="game-btn" id="startBtn">START GAME</button>
+            <p style="margin-top:20px;font-size:12px">
+                W / ↑ — gaz | A / D — boshqarish
+            </p>
+        </div>
+
+        <div class="overlay hidden" id="gameOverScreen">
+            <h1 style="color:#ff4655">GAME OVER</h1>
+            <p>
+                Natijangiz: <b id="finalScore">0</b><br>
+                Rekord: <b id="finalBest">0</b>
+            </p>
+            <button class="game-btn" id="restartBtn">PLAY AGAIN</button>
+        </div>
+
+        <div class="overlay hidden" id="pauseScreen">
+            <h1>PAUSED</h1>
+            <p>O‘yin to‘xtatildi.</p>
+            <button class="game-btn" id="continueBtn">CONTINUE</button>
+        </div>
+
+    </div>
+
+    <div class="controls">
+        <button class="control-btn" id="leftBtn">◀</button>
+        <button class="control-btn" id="gasBtn">▲</button>
+        <button class="control-btn" id="rightBtn">▶</button>
+        <button class="control-btn" id="pauseBtn">Ⅱ</button>
+    </div>
+
+    <div class="hint">
+        W / ↑ — gaz | A / D — burilish | SPACE — pauza
+    </div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreEl = document.getElementById("score");
+const speedEl = document.getElementById("speed");
+const bestEl = document.getElementById("best");
+
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOverScreen");
+const pauseScreen = document.getElementById("pauseScreen");
+
+let W, H, roadLeft, roadWidth, laneWidth;
+
+function resize() {
+    const rect = canvas.getBoundingClientRect();
+
+    W = rect.width;
+    H = rect.height;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    roadWidth = W * 0.72;
+    roadLeft = (W - roadWidth) / 2;
+    laneWidth = roadWidth / 3;
+}
+
+window.addEventListener("resize", resize);
+
+const keys = {};
+
+let player = {
+    lane: 1,
+    x: 0,
+    y: 0,
+    width: 42,
+    height: 76
+};
+
+let enemies = [];
+
+let score = 0;
+let speed = 0;
+
+const maxSpeed = 1000;
+const acceleration = 500;
+const braking = 250;
+
+let roadOffset = 0;
+let spawnTimer = 0;
+let gameRunning = false;
+let paused = false;
+let lastTime = 0;
+
+let best = Number(localStorage.getItem("racerBest") || 0);
+
+bestEl.textContent = best;
+
+const enemyColors = [
+    "#f04452",
+    "#ffb52e",
+    "#9b72ed",
+    "#e8edf5",
+    "#26b8a4"
+];
+
+function lanePosition(lane) {
+    return roadLeft + lane * laneWidth +
+        (laneWidth - player.width) / 2;
+}
+
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+}
+
+function drawRoad() {
+
+    ctx.fillStyle = "#287346";
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < 12; i++) {
+        let y = (i * 100 + roadOffset * 0.4) % (H + 100);
+
+        ctx.fillStyle = "#348653";
+        ctx.beginPath();
+        ctx.arc(20, y, 9, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(W - 20, y, 9, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.fillStyle = "#30343c";
+    ctx.fillRect(roadLeft, 0, roadWidth, H);
+
+    ctx.fillStyle = "#f2c14e";
+    ctx.fillRect(roadLeft, 0, 5, H);
+    ctx.fillRect(roadLeft + roadWidth - 5, 0, 5, H);
+
+    ctx.fillStyle = "#e7e8ec";
+
+    for (let lane = 1; lane < 3; lane++) {
+        let x = roadLeft + lane * laneWidth;
+
+        for (let y = -70; y < H + 70; y += 100) {
+            let drawY = (y + roadOffset) % (H + 100);
+            ctx.fillRect(x - 2, drawY, 4, 55);
+        }
+    }
+
+    for (let i = 0; i < 10; i++) {
+        let y = (i * 110 + roadOffset * 1.3) % (H + 110);
+
+        ctx.fillStyle = "#ffe27a";
+        ctx.fillRect(roadLeft - 11, y, 5, 15);
+        ctx.fillRect(roadLeft + roadWidth + 6, y, 5, 15);
+    }
+}
+
+function drawCar(x, y, color, isPlayer = false) {
+
+    const w = player.width;
+    const h = player.height;
+
+    ctx.save();
+
+    ctx.fillStyle = "#111820";
+    roundRect(x + 4, y + 6, w, h, 10);
+    ctx.fill();
+
+    ctx.fillStyle = "#111319";
+
+    [
+        [x - 4, y + 14],
+        [x + w - 4, y + 14],
+        [x - 4, y + 49],
+        [x + w - 4, y + 49]
+    ].forEach(([wx, wy]) => {
+        roundRect(wx, wy, 8, 19, 3);
+        ctx.fill();
+    });
+
+    ctx.fillStyle = color;
+    roundRect(x, y, w, h, 10);
+    ctx.fill();
+
+    ctx.fillStyle = "#263f54";
+
+    ctx.beginPath();
+    ctx.moveTo(x + 9, y + 15);
+    ctx.lineTo(x + w - 9, y + 15);
+    ctx.lineTo(x + w - 12, y + 35);
+    ctx.lineTo(x + 12, y + 35);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#1d3447";
+    roundRect(x + 11, y + 44, w - 22, 18, 4);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff4c7";
+
+    roundRect(x + 5, y + 3, 9, 5, 2);
+    ctx.fill();
+
+    roundRect(x + w - 14, y + 3, 9, 5, 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ff3048";
+
+    roundRect(x + 5, y + h - 6, 9, 4, 2);
+    ctx.fill();
+
+    roundRect(x + w - 14, y + h - 6, 9, 4, 2);
+    ctx.fill();
+
+    if (isPlayer) {
+        ctx.fillStyle = "#a5f3ff";
+        roundRect(x + 17, y + 4, 8, 3, 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+function spawnEnemy() {
+
+    let lane = Math.floor(Math.random() * 3);
+
+    if (enemies.some(e => e.lane === lane && e.y < 150)) {
+        return;
+    }
+
+    enemies.push({
+        lane,
+        x: lanePosition(lane),
+        y: -100,
+        color: enemyColors[
+            Math.floor(Math.random() * enemyColors.length)
+        ]
+    });
+}
+
+function collision(a, b) {
+    return (
+        a.x + 7 < b.x + b.width - 7 &&
+        a.x + a.width - 7 > b.x + 7 &&
+        a.y + 7 < b.y + b.height - 7 &&
+        a.y + a.height - 7 > b.y + 7
+    );
+}
+
+function startGame() {
+
+    score = 0;
+    speed = 0;
+    roadOffset = 0;
+    spawnTimer = 0;
+    enemies = [];
+
+    player.lane = 1;
+    player.x = lanePosition(1);
+    player.y = H - 115;
+
+    gameRunning = true;
+    paused = false;
+
+    startScreen.classList.add("hidden");
+    gameOverScreen.classList.add("hidden");
+    pauseScreen.classList.add("hidden");
+
+    lastTime = performance.now();
+}
+
+function endGame() {
+
+    gameRunning = false;
+
+    best = Math.max(best, Math.floor(score));
+
+    localStorage.setItem("racerBest", best);
+
+    bestEl.textContent = best;
+
+    document.getElementById("finalScore").textContent =
+        Math.floor(score);
+
+    document.getElementById("finalBest").textContent = best;
+
+    gameOverScreen.classList.remove("hidden");
+}
+
+function togglePause() {
+
+    if (!gameRunning) return;
+
+    paused = !paused;
+
+    pauseScreen.classList.toggle("hidden", !paused);
+}
+
+function moveLeft() {
+    if (gameRunning && !paused) {
+        player.lane = Math.max(0, player.lane - 1);
+    }
+}
+
+function moveRight() {
+    if (gameRunning && !paused) {
+        player.lane = Math.min(2, player.lane + 1);
+    }
+}
+
+function update(dt) {
+
+    if (!gameRunning || paused) return;
+
+    // Gaz bosilganda 1500 KM/H gacha tezlashadi
+    if (keys.ArrowUp || keys.w || keys.W || keys.gas) {
+        speed += acceleration * dt;
+    } else {
+        speed -= braking * dt;
+    }
+
+    speed = Math.max(0, Math.min(maxSpeed, speed));
+
+    // Yo'l harakati
+    roadOffset += speed * dt * 1.4;
+
+    // Ball
+    score += speed * dt * 0.09;
+
+    scoreEl.textContent =
+        String(Math.floor(score)).padStart(6, "0");
+
+    speedEl.textContent = Math.floor(speed) + " KM/H";
+
+    const targetX = lanePosition(player.lane);
+
+    player.x += (targetX - player.x) * Math.min(1, dt * 12);
+
+    // Mashinalar harakati
+    if (speed > 0) {
+
+        spawnTimer += dt;
+
+        let spawnDelay = Math.max(0.48, 1.1 - speed / 2000);
+
+        if (spawnTimer >= spawnDelay) {
+            spawnTimer = 0;
+            spawnEnemy();
+        }
+
+        enemies.forEach(enemy => {
+            enemy.y += speed * dt * 1.35;
+            enemy.x = lanePosition(enemy.lane);
+        });
+    }
+
+    enemies = enemies.filter(e => e.y < H + 100);
+
+    for (const enemy of enemies) {
+
+        if (collision(
+            player,
+            {
+                x: enemy.x,
+                y: enemy.y,
+                width: player.width,
+                height: player.height
+            }
+        )) {
+            endGame();
+            break;
+        }
+    }
+}
+
+function draw() {
+
+    drawRoad();
+
+    enemies.forEach(enemy => {
+        drawCar(enemy.x, enemy.y, enemy.color);
+    });
+
+    drawCar(player.x, player.y, "#168ff0", true);
+}
+
+function gameLoop(timestamp) {
+
+    let dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    dt = Math.min(dt, 0.04);
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Keyboard controls
+
+document.addEventListener("keydown", e => {
+
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) {
+        e.preventDefault();
+    }
+
+    if (e.repeat) return;
+
+    keys[e.key] = true;
+
+    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+        moveLeft();
+    }
+
+    if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+        moveRight();
+    }
+
+    if (e.key === " " || e.key.toLowerCase() === "p") {
+        togglePause();
+    }
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key] = false;
+});
+
+window.addEventListener("blur", () => {
+    Object.keys(keys).forEach(key => keys[key] = false);
+});
+
+// Buttons
+
+document.getElementById("startBtn").onclick = startGame;
+document.getElementById("restartBtn").onclick = startGame;
+document.getElementById("pauseBtn").onclick = togglePause;
+document.getElementById("continueBtn").onclick = togglePause;
+
+document.getElementById("leftBtn").addEventListener("pointerdown", e => {
+    e.preventDefault();
+    moveLeft();
+});
+
+document.getElementById("rightBtn").addEventListener("pointerdown", e => {
+    e.preventDefault();
+    moveRight();
+});
+
+const gasBtn = document.getElementById("gasBtn");
+
+gasBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    keys.gas = true;
+});
+
+["pointerup", "pointerleave", "pointercancel"].forEach(event => {
+    gasBtn.addEventListener(event, () => {
+        keys.gas = false;
+    });
+});
+
+// Initial setup
+
+resize();
+
+player.x = lanePosition(1);
+player.y = H - 115;
+
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
